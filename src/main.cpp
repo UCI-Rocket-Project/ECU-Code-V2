@@ -58,19 +58,7 @@ const int thermoPin = A21;
 int thermocouple[11];
 
 //Solenoid Pins
-const int s1 = 1;
-const int s2 = 2;
-const int s3 = 3;
-const int s4 = 4;
-const int s5 = 5;
-const int s6 = 6;
-const int s7 = 7;
-const int s8 = 8;
-const int s9 = 9;
-const int s10 = 10;
-
-const int solenoidPins[] = {1, 2, 3, 4, 5, 6, 6, 7, 8, 9, 10};
-int solenoidState[11];
+int solenoids[][2] = {{2, 0}, {3, 0}, {4, 0}, {5, 0}, {6, 0}, {7, 0}, {8, 0}, {9, 0}, {10, 0}};
 
 
 //Mux Channel Select
@@ -95,8 +83,6 @@ int average = 0;
 
 
 //TEST
-const int relayPins[] = {12, 11, 10, 9, 8, 7};
-
 char in;
 int i;
 int num;
@@ -119,9 +105,9 @@ void setup() {
     digitalWrite(i, LOW);
   }
 
-  // initial solenoid states
-  for (int i = 1; i <= 10; i++) {
-    solenoidState[i] = 0;
+  // all off initial solenoid state
+  for (int i = 0; i < sizeof(solenoids); i++) {
+    solenoids[i][1] = 0;
   }
 
   // initialize solenoid current sensor mux pins
@@ -225,8 +211,6 @@ void loop() {
   digitalWrite(led, HIGH);
   digitalWrite(sled, HIGH);
 
-  //turn on test solenoid
-  digitalWrite(s1, solenoidState[1]);
 
   //Cycle through Mux channels to read all onboard sensors
   solenoidCurrentRead();
@@ -262,19 +246,29 @@ void loop() {
 
   /* -- RELAY CONTROL MODE --
    * Relay trigger format
-   * [relayPins[#]][relay # state] i.e. 00 -> relayPins[0] OFF
+   * [solenoidPins[#]][relay # state] i.e. 00 -> relayPins[0] OFF
    */
   if(isDigit(msg[0]) && isDigit(msg[1])){
     if(int(msg[1])-48 == 1){
-      digitalWrite(solenoidPins[int(msg[0])-48], HIGH);      
+      solenoids[int(msg[0])-48][1] = 1;      
     }else{
-      digitalWrite(solenoidPins[int(msg[0])-48], LOW);
+      solenoids[int(msg[0])-48][1] = 0;
     }
     /* Serial.println(int(msg[0])-48);  //FOR TEST
     Serial.println(int(msg[1])-48);  //FOR TEST
-    delay(2000);*/
+    */
   }
 
+
+
+  /* Set Solenoid States using 2D Matrix
+   * [int solenoidPinNum][int solenoidState]
+   */
+  for(int i = 0; i < sizeof(solenoids); i++) {
+    if(sizeof(solenoids)[i] == 2) {
+      digitalWrite(solenoids[i][0], solenoids[i][1]);
+    }
+  }
 
 }
 
@@ -405,7 +399,7 @@ void printData() {
   dataline += ',';
 
   for (int i = 1; i <= 10; i++) {
-    dataline += String(solenoidState[i]);
+    dataline += String(solenoids[i][1]);
     dataline += ',';
   }
 
