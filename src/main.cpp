@@ -10,6 +10,7 @@ int readCurrentMux(int currentChannel);
 void thermocoupleRead();
 int readThermoMux(int thermoChannel);
 void printData();
+void setSolenoidStates();
 
 
 
@@ -32,7 +33,7 @@ const int ss2 = 20;
 const int ss3 = 21;
 const int ssSignal = A5;
 
-int solenoidCurrent[11];
+
 int v3RegulatorCurrent = 0;
 int v5RegulatorCurrent = 0;
 int v12RegulatorCurrent = 0;
@@ -58,14 +59,17 @@ const int thermoPin = A21;
 int thermocouple[11];
 
 //Solenoid Pins
-int solenoids[][2] = {{2, 0}, {3, 0}, {4, 0}, {5, 0}, {6, 0}, {7, 0}, {8, 0}, {9, 0}, {10, 0}};
+const int solenoidPins[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+int solenoidState[10];
 
 
 //Mux Channel Select
 const int muxChannel[16][4] = {{0, 0, 0, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {1, 1, 0, 0}, {0, 0, 1, 0}, {1, 0, 1, 0}, {0, 1, 1, 0}, {1, 1, 1, 0}, {0, 0, 0, 1}, {1, 0, 0, 1}, {0, 1, 0, 1}, {1, 1, 0, 1}, {0, 0, 1, 1}, {1, 0, 1, 1}, {0, 1, 1, 1}, {1, 1, 1, 1} };
 long counter = 0;
 
-
+//Solenoid current sensors
+const int currentMuxMap[10] = {4, 3, 6, 5, 8, 7, 10, 9, 12, 11};
+int solenoidCurrent[16];
 
 
 //Running Average for thermocouple
@@ -78,16 +82,15 @@ int average = 0;
 
 
 
-
-
-
-
-//TEST
+// SERIAL READ
 char in;
 int i;
 int num;
 
-
+// HEARTBEAT
+bool heartbeat = false;
+unsigned long heartbeatStart;
+const int HEARTBEAT_SPAN = 5000;
 
 
 
@@ -97,17 +100,14 @@ void setup() {
 
 
   // initialize serial
+  Serial5.begin(115200);
   Serial.begin(115200);
 
-  // initialize solenoid pins
-  for (int i = 0; i <= 10; i++) {
+  // initialize solenoid pins and states
+  for (int i = 0; i < 10; i++) {
     pinMode(i, OUTPUT);
+    solenoidState[i] = 0;
     digitalWrite(i, LOW);
-  }
-
-  // all off initial solenoid state
-  for (int i = 0; i < sizeof(solenoids); i++) {
-    solenoids[i][1] = 0;
   }
 
   // initialize solenoid current sensor mux pins
@@ -130,6 +130,11 @@ void setup() {
   Serial.print("hit");
   // initialize status led
   pinMode(led, OUTPUT);
+
+  //For running average on thermocouple
+  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+    readings[thisReading] = 0;
+  }
 
 
 
@@ -185,10 +190,7 @@ void setup() {
   logfile.println(dataline);
   logfile.flush();
 
-  //For running average on thermocouple
-  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
-    readings[thisReading] = 0;
-  }
+  
 
   // setup complete blink
   for(int i = 0; i < 3; i++) {
@@ -221,8 +223,6 @@ void loop() {
   digitalWrite(led, LOW);
 
 
-  //save data to SD card and print to serial
-  printData();
 
 
   //reset vars for Serial monitor input (done via aggregation of chars)
@@ -230,9 +230,9 @@ void loop() {
   char msg[32] = "";
 
   //Serial input
-  while(Serial.available() > 0) {
+  while(Serial5.available() > 0) {
       //READ SERIAL MONITOR CHAR
-      in = Serial.read(); //.read() is non-blocking function (minimal delay)
+      in = Serial5.read(); //.read() is non-blocking function (minimal delay)
       
       //Serial.println(String(int(in)-48) + String(msg));  //FOR TEST
       
@@ -246,29 +246,43 @@ void loop() {
 
   /* -- RELAY CONTROL MODE --
    * Relay trigger format
-   * [solenoidPins[#]][relay # state] i.e. 00 -> relayPins[0] OFF
+   * [relayPins[#]][relay # state] i.e. 00 -> relayPins[0] OFF
    */
-  if(isDigit(msg[0]) && isDigit(msg[1])){
-    if(int(msg[1])-48 == 1){
-      solenoids[int(msg[0])-48][1] = 1;      
+  //if(isDigit(msg[0]) && isDigit(msg[1])){
+  //  solenoidState[int(msg[0])-48] = int(msg[1])-48;
+    /*if(int(msg[1])-48 == 1){
+      digitalWrite(solenoidPins[int(msg[0])-48], HIGH);      
     }else{
-      solenoids[int(msg[0])-48][1] = 0;
-    }
+      digitalWrite(solenoidPins[int(msg[0])-48], LOW);
+    }*/
     /* Serial.println(int(msg[0])-48);  //FOR TEST
     Serial.println(int(msg[1])-48);  //FOR TEST
-    */
-  }
-
-
-
-  /* Set Solenoid States using 2D Matrix
-   * [int solenoidPinNum][int solenoidState]
-   */
-  for(int i = 0; i < sizeof(solenoids); i++) {
-    if(sizeof(solenoids)[i] == 2) {
-      digitalWrite(solenoids[i][0], solenoids[i][1]);
+    delay(2000);*/
+  //}
+  int arrCount = 0;
+  for(int i = 0; i < 32; i++) {
+    if(msg[i] == '0' || msg[i] == '1') {
+      solenoidState[arrCount] = msg[i] - '0';
+      arrCount++;
     }
   }
+
+
+
+
+  /* -- HEARTBEAT --
+   * looking for msg == 'rp' and will send state back on serial
+   */
+  if(msg[0] == 'r' && msg[1] == 'p') {
+    heartbeat = true;
+    heartbeatStart = millis();
+  }
+
+  setSolenoidStates();
+
+
+  //save data to SD card and print to serial
+  printData();
 
 }
 
@@ -333,12 +347,13 @@ void solenoidCurrentRead() {
 
 
   //read Mux
-  for (int i = 1; i <= 10; i++) {
-    if (i % 2 == 0) {
+  for (int i = 0; i < 10; i++) {
+    /*if (i % 2 == 0) {
       solenoidCurrent[i] = readCurrentMux(i + 1);
     } else {
       solenoidCurrent[i] = readCurrentMux(i + 3);
-    }
+    }*/
+    solenoidCurrent[i] = readCurrentMux(currentMuxMap[i]);
   }
   v3RegulatorCurrent = readCurrentMux(13);
   v5RegulatorCurrent = readCurrentMux(14);
@@ -357,19 +372,18 @@ int readCurrentMux(int currentChannel) {
   }
 
   //read the value at the SIG pin
-  int currentVal = analogRead(ssSignal);
+  //int currentVal = analogRead(ssSignal);
   //return the value
-  return currentVal;
+  return analogRead(ssSignal);
 }
 
 //reads thermocouple data
-
 void thermocoupleRead() {
 
-
+  //only 10 thermocouple pins
   //read Mux
-  for (int i = 1; i <= 10; i++) {
-    thermocouple[i] = readThermoMux(16 - i);
+  for (int i = 0; i < 10; i++) {
+    thermocouple[i] = readThermoMux(16 - i - 1);
   }
 
 
@@ -384,10 +398,15 @@ int readThermoMux(int thermoChannel) {
   }
 
   //read the value at the SIG pin
-
-  int thermoVal =analogRead(thermoPin); //ads.readADC_SingleEnded(thermoPin);
+  //int thermoVal = analogRead(thermoPin); //ads.readADC_SingleEnded(thermoPin);
   //return the value
-  return thermoVal;
+  return analogRead(thermoPin);
+}
+
+void setSolenoidStates() {
+  for(int i = 0; i < 10; i++) {
+    digitalWrite(solenoidPins[i], solenoidState[i]);
+  }
 }
 
 
@@ -395,20 +414,18 @@ int readThermoMux(int thermoChannel) {
 
 void printData() {
 
-  dataline = String(batteryVoltage );
+  dataline = String(batteryVoltage);
   dataline += ',';
 
-  for (int i = 1; i <= 10; i++) {
-    dataline += String(solenoids[i][1]);
+  for (int i = 0; i < 10; i++) {
+    dataline += String(solenoidState[i]);
     dataline += ',';
   }
 
-
-  for (int i = 1; i <= 10; i++) {
+  for (int i = 0; i < 10; i++) {
     dataline += String(solenoidCurrent[i]);
     dataline += ',';
   }
-
 
   dataline += String(v3RegulatorCurrent);
   dataline += ',';
@@ -422,42 +439,52 @@ void printData() {
     dataline += ',';
   }
 
-
   for (int i = 1; i <= 4; i++) {
     dataline += String(analogInput[i]);
     dataline += ',';
   }
 
   //averages thermocouple readings
-  avg();
+  /*avg();
 
   dataline += String(average);
-  dataline += ',';
+  dataline += ',';*/
 
-  for (int i = 2; i <= 10; i++) {
-    dataline += String(thermocouple[i]);
-    dataline += ',';
+  for (int i = 0; i < 10; i++) {
+    if(i == 0) {
+      dataline += String(analogRead(A20));
+      dataline += ',';
+    }else{
+      dataline += String(thermocouple[i]);
+      dataline += ',';
+    }
   }
 
-  dataline += String(millis());
-  dataline += '\n';
-  
+  dataline += String(millis());  
 
   //log to SD card
   char filename[fileName.length() + 1];
   fileName.toCharArray(filename, fileName.length()+1);
   logfile = SD.open(filename, FILE_WRITE);
   if(logfile) {
-    logfile.print(dataline);
+    logfile.println(dataline);
+    dataline += ",1,";
     digitalWrite(led, LOW);
   }else{
-    Serial.print("error opening " + fileName + "\t");
+    dataline += ",0,";
     digitalWrite(led, HIGH);
   }
-  logfile.close();
-  Serial.print(dataline);
-  //logfile.print(dataline);
-  //logfile.flush();
 
+  dataline += String(heartbeat);
+
+  logfile.close();
+  Serial.println(dataline);
+  Serial5.println(dataline); //added
+
+  // reset heartbeat
+  if(millis() - heartbeatStart > HEARTBEAT_SPAN) {
+    heartbeat = false;
+  }
 
 }
+
