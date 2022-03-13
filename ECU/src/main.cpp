@@ -2,6 +2,8 @@
 #include <SD.h>
 #include <SPI.h>
 
+
+
 void avg();
 void pressureSensorRead();
 int readPressureMux(int pressureChannel);
@@ -94,6 +96,12 @@ const int HEARTBEAT_SPAN = 5000;
 
 
 
+// Wired telemetry data values
+unsigned long prvMsgTm;
+#define DELAY 10
+
+
+
 
 
 void setup() {
@@ -102,6 +110,9 @@ void setup() {
   // initialize serial
   Serial5.begin(115200);
   Serial.begin(115200);
+
+  // initialize interval vars
+  prvMsgTm = millis();
 
   // initialize solenoid pins and states
   for (int i = 0; i < 10; i++) {
@@ -203,7 +214,9 @@ void setup() {
 }
 
 
-
+char msg[32] = "";
+int arrCount;
+int count;
 
 
 void loop() {
@@ -227,7 +240,7 @@ void loop() {
 
   //reset vars for Serial monitor input (done via aggregation of chars)
   i = 0;
-  char msg[32] = "";
+  
 
   //Serial input
   while(Serial5.available() > 0) {
@@ -259,13 +272,46 @@ void loop() {
     Serial.println(int(msg[1])-48);  //FOR TEST
     delay(2000);*/
   //}
-  int arrCount = 0;
+
+  // Count num elements in msg
+  arrCount = 0;
   for(int i = 0; i < 32; i++) {
     if(msg[i] == '0' || msg[i] == '1') {
-      solenoidState[arrCount] = msg[i] - '0';
       arrCount++;
     }
   }
+
+  // arrCount == sizeof(solenoidPins)/sizeof(solenoidPins[0])
+  /*if(msg[0] == 'S' && msg[15] == 'E') {
+    arrCount = 0;
+    for(int i = 0; i < 32; i++) {
+      if(msg[i] == '0' || msg[i] == '1') {
+        solenoidState[arrCount] = msg[i] - '0';
+        arrCount++;
+      }
+    }
+  }*/
+
+  count = 0;
+  while(msg[count] != 'S'){
+    count++;
+  }
+  arrCount = 0;
+  while(msg[count] != 'E' && count < 17 && arrCount < 10){
+    if(msg[count] == '0'){
+      solenoidState[arrCount] = 0;
+      arrCount++;
+    }
+    if(msg[count] == '1') {
+      solenoidState[arrCount] = 1;
+      arrCount++;
+    }
+    count++;
+  }
+
+
+  Serial.println(msg);
+
 
 
 
@@ -283,6 +329,9 @@ void loop() {
 
   //save data to SD card and print to serial
   printData();
+
+  // delay serial write as opposed to sychronous delay
+  //delay(DELAY);
 
 }
 
@@ -444,21 +493,14 @@ void printData() {
     dataline += ',';
   }
 
-  //averages thermocouple readings
-  /*avg();
-
-  dataline += String(average);
-  dataline += ',';*/
-
   for (int i = 0; i < 10; i++) {
-    if(i == 0) {
-      dataline += String(analogRead(A20));
-      dataline += ',';
-    }else{
-      dataline += String(thermocouple[i]);
-      dataline += ',';
-    }
+    dataline += String(thermocouple[i]);
+    dataline += ',';
   }
+
+  dataline += String(analogRead(A20));
+  dataline += ',';
+    
 
   dataline += String(millis());  
 
@@ -478,8 +520,14 @@ void printData() {
   dataline += String(heartbeat);
 
   logfile.close();
-  Serial.println(dataline);
-  Serial5.println(dataline); //added
+
+
+  // nonblocking delayed wired telemetry
+  if(millis() - prvMsgTm > DELAY) {
+    Serial.println("S" + dataline + "E");
+    Serial5.println("S" + dataline + "E"); //added only do every interval
+    prvMsgTm = millis();
+  }
 
   // reset heartbeat
   if(millis() - heartbeatStart > HEARTBEAT_SPAN) {
