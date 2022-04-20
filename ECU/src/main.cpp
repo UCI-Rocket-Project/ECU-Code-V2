@@ -2,8 +2,6 @@
 #include <SD.h>
 #include <SPI.h>
 
-
-
 void avg();
 void pressureSensorRead();
 int readPressureMux(int pressureChannel);
@@ -14,33 +12,28 @@ int readThermoMux(int thermoChannel);
 void printData();
 void setSolenoidStates();
 
-
-
-
 // chipselect for teensy 3.6 sdcard
 // sdcard
 File logfile;
 String dataline;
 String fileName;
 
-
-//indicator LED
+// indicator LED
 const int led = 13;
 const int sled = 0;
 
-//Current Sensor Mux
+// Current Sensor Mux
 const int ss0 = 23;
 const int ss1 = 22;
 const int ss2 = 20;
 const int ss3 = 21;
 const int ssSignal = A5;
 
-
 int v3RegulatorCurrent = 0;
 int v5RegulatorCurrent = 0;
 int v12RegulatorCurrent = 0;
 
-//Pressure Transducer / Analog Mux
+// Pressure Transducer / Analog Mux
 const int ps0 = 27;
 const int ps1 = 26;
 const int ps2 = 24;
@@ -51,7 +44,7 @@ int pressureSensor[11];
 int analogInput[5];
 int batteryVoltage = 0;
 
-//Thermocouple Mux
+// Thermocouple Mux
 const int ts0 = 17;
 const int ts1 = 16;
 const int ts2 = 14;
@@ -60,29 +53,25 @@ const int thermoPin = A21;
 
 int thermocouple[11];
 
-//Solenoid Pins
+// Solenoid Pins
 const int solenoidPins[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 int solenoidState[10];
 
-
-//Mux Channel Select
-const int muxChannel[16][4] = {{0, 0, 0, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {1, 1, 0, 0}, {0, 0, 1, 0}, {1, 0, 1, 0}, {0, 1, 1, 0}, {1, 1, 1, 0}, {0, 0, 0, 1}, {1, 0, 0, 1}, {0, 1, 0, 1}, {1, 1, 0, 1}, {0, 0, 1, 1}, {1, 0, 1, 1}, {0, 1, 1, 1}, {1, 1, 1, 1} };
+// Mux Channel Select
+const int muxChannel[16][4] = {{0, 0, 0, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {1, 1, 0, 0}, {0, 0, 1, 0}, {1, 0, 1, 0}, {0, 1, 1, 0}, {1, 1, 1, 0}, {0, 0, 0, 1}, {1, 0, 0, 1}, {0, 1, 0, 1}, {1, 1, 0, 1}, {0, 0, 1, 1}, {1, 0, 1, 1}, {0, 1, 1, 1}, {1, 1, 1, 1}};
 long counter = 0;
 
-//Solenoid current sensors
+// Solenoid current sensors
 const int currentMuxMap[10] = {4, 3, 6, 5, 8, 7, 10, 9, 12, 11};
 int solenoidCurrent[16];
 
-
-//Running Average for thermocouple
+// Running Average for thermocouple
 const int numReadings = 10;
 
-int readings[numReadings];      // the readings from the analog input
-int readIndex = 0;              // the index of the current reading
-int total = 0;                  // the running total
+int readings[numReadings]; // the readings from the analog input
+int readIndex = 0;         // the index of the current reading
+int total = 0;             // the running total
 int average = 0;
-
-
 
 // SERIAL READ
 char in;
@@ -94,47 +83,38 @@ bool heartbeat = false;
 unsigned long heartbeatStart;
 const int HEARTBEAT_SPAN = 5000;
 
-
-
-// Wired telemetry data values
-unsigned long prvMsgTm;
-#define DELAY 10
-
-
-
-
-
-void setup() {
-
+void setup()
+{
 
   // initialize serial
   Serial5.begin(115200);
   Serial.begin(115200);
-
-  // initialize interval vars
-  prvMsgTm = millis();
-
+ 
   // initialize solenoid pins and states
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
     pinMode(i, OUTPUT);
     solenoidState[i] = 0;
     digitalWrite(i, LOW);
   }
 
   // initialize solenoid current sensor mux pins
-  for (int i = 20; i <= 23; i++) {
+  for (int i = 20; i <= 23; i++)
+  {
     pinMode(i, OUTPUT);
     digitalWrite(i, LOW);
   }
 
   // initialize pressure transducer sensor mux pins
-  for (int i = 24; i <= 27; i++) {
+  for (int i = 24; i <= 27; i++)
+  {
     pinMode(i, OUTPUT);
     digitalWrite(i, LOW);
   }
 
   // initialize thermocouple sensor mux pins
-  for (int i = 14; i <= 17; i++) {
+  for (int i = 14; i <= 17; i++)
+  {
     pinMode(i, OUTPUT);
     digitalWrite(i, LOW);
   }
@@ -142,43 +122,41 @@ void setup() {
   // initialize status led
   pinMode(led, OUTPUT);
 
-  //For running average on thermocouple
-  for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+  // For running average on thermocouple
+  for (int thisReading = 0; thisReading < numReadings; thisReading++)
+  {
     readings[thisReading] = 0;
   }
 
-
-
-
-
-  //set ADC Resolution (13 bit on board ADC)
+  // set ADC Resolution (13 bit on board ADC)
   analogReadResolution(12);
 
-
   // pre check complete blink
-  for(int i = 0; i < 20; i++) {
+  for (int i = 0; i < 20; i++)
+  {
     digitalWrite(led, HIGH);
     delay(100);
     digitalWrite(led, LOW);
     delay(100);
   }
 
-  
-
   // initialize SD Card
-  if (!SD.begin(BUILTIN_SDCARD)) {
+  if (!SD.begin(BUILTIN_SDCARD))
+  {
     Serial.println("Card failed, or not present");
   }
-  else Serial.println("Card initialized.");
-
+  else
+    Serial.println("Card initialized.");
 
   // create a new file on SD card
   int i = 0;
-  while (true) {
+  while (true)
+  {
     fileName = "LOG" + String(i) + ".CSV";
     char filename[fileName.length() + 1];
-    fileName.toCharArray(filename, fileName.length()+1);
-    if (! SD.exists(filename)) {
+    fileName.toCharArray(filename, fileName.length() + 1);
+    if (!SD.exists(filename))
+    {
       // only open a new file if it doesn't exist
       logfile = SD.open(filename, FILE_WRITE);
       logfile.close();
@@ -188,7 +166,8 @@ void setup() {
     Serial.println(i);
     delay(100);
   }
-  if (! logfile) {
+  if (!logfile)
+  {
     Serial.println("couldnt create file");
   }
   Serial.print("Logging to: ");
@@ -196,38 +175,33 @@ void setup() {
 
   delay(2000);
 
-  //CSV starting line
-  dataline = String( "Battery Voltage,Solenoid State 1,Solenoid State 2,Solenoid State 3,Solenoid State 4,Solenoid State 5,Solenoid State 6,Solenoid State 7,Solenoid State 8,Solenoid State 9,Solenoid State 10,Solenoid Current 1,Solenoid Current 2,Solenoid Current 3,Solenoid Current 4,Solenoid Current 5,Solenoid Current 6,Solenoid Current 7,Solenoid Current 8,Solenoid Current 9,Solenoid Current 10,3.3V Reg Current,5V Reg Current,12V Reg Current,Pressure Sensor 1,Pressure Sensor 2,Pressure Sensor 3,Pressure Sensor 4,Pressure Sensor 5,Pressure Sensor 6,Pressure Sensor 7,Pressure Sensor 8,Pressure Sensor 9,Pressure Sensor 10,Analog Sensor 1,Analog Sensor 2,Analog Sensor 3,Analog Sensor 4,Thermocouple 1,Thermocouple 2,Thermocouple 3,Thermocouple 4,Thermocouple 5,Thermocouple 6,Thermocouple 7,Thermocouple 8,Thermocouple 9,Thermocouple 10,Time");
+  // CSV starting line
+  dataline = String("Battery Voltage,Solenoid State 1,Solenoid State 2,Solenoid State 3,Solenoid State 4,Solenoid State 5,Solenoid State 6,Solenoid State 7,Solenoid State 8,Solenoid State 9,Solenoid State 10,Solenoid Current 1,Solenoid Current 2,Solenoid Current 3,Solenoid Current 4,Solenoid Current 5,Solenoid Current 6,Solenoid Current 7,Solenoid Current 8,Solenoid Current 9,Solenoid Current 10,3.3V Reg Current,5V Reg Current,12V Reg Current,Pressure Sensor 1,Pressure Sensor 2,Pressure Sensor 3,Pressure Sensor 4,Pressure Sensor 5,Pressure Sensor 6,Pressure Sensor 7,Pressure Sensor 8,Pressure Sensor 9,Pressure Sensor 10,Analog Sensor 1,Analog Sensor 2,Analog Sensor 3,Analog Sensor 4,Thermocouple 1,Thermocouple 2,Thermocouple 3,Thermocouple 4,Thermocouple 5,Thermocouple 6,Thermocouple 7,Thermocouple 8,Thermocouple 9,Thermocouple 10,Time");
   logfile.println(dataline);
   logfile.flush();
 
-  
-
   // setup complete blink
-  for(int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     digitalWrite(led, HIGH);
     delay(1000);
     digitalWrite(led, LOW);
     delay(1000);
   }
-
 }
 
-
 char msg[32] = "";
+//char msg[33] = "";
 int arrCount;
 int count;
 
-
-void loop() {
-
-
+void loop()
+{
 
   digitalWrite(led, HIGH);
   digitalWrite(sled, HIGH);
 
-
-  //Cycle through Mux channels to read all onboard sensors
+  // Cycle through Mux channels to read all onboard sensors
   solenoidCurrentRead();
   pressureSensorRead();
   thermocoupleRead();
@@ -235,51 +209,54 @@ void loop() {
   digitalWrite(sled, LOW);
   digitalWrite(led, LOW);
 
-
-
-
-  //reset vars for Serial monitor input (done via aggregation of chars)
+  // reset vars for Serial monitor input (done via aggregation of chars)
   i = 0;
-  
 
-  //Serial input
-  while(Serial5.available() > 0) {
-      //READ SERIAL MONITOR CHAR
-      in = Serial5.read(); //.read() is non-blocking function (minimal delay)
-      
-      //Serial.println(String(int(in)-48) + String(msg));  //FOR TEST
-      
-      delayMicroseconds(100); //DO NOT DELETE THIS DELAY
-      if(int(in) == 10){  //if newline, break loop
-        break;
-      }
-      msg[i] = in;
-      i++;
+  // Serial input
+  while (Serial5.available() > 0)
+  {
+    // READ SERIAL MONITOR CHAR
+    in = Serial5.read(); //.read() is non-blocking function (minimal delay)
+
+    // Serial.println(String(int(in)-48) + String(msg));  //FOR TEST
+
+    delayMicroseconds(120); // DO NOT DELETE THIS DELAY
+    if (int(in) == 10)
+    { // if newline, break loop
+      break;
+    }
+    msg[i] = in;
+    i++;
   }
+
+
 
   /* -- RELAY CONTROL MODE --
    * Relay trigger format
    * [relayPins[#]][relay # state] i.e. 00 -> relayPins[0] OFF
    */
-  //if(isDigit(msg[0]) && isDigit(msg[1])){
-  //  solenoidState[int(msg[0])-48] = int(msg[1])-48;
-    /*if(int(msg[1])-48 == 1){
-      digitalWrite(solenoidPins[int(msg[0])-48], HIGH);      
-    }else{
-      digitalWrite(solenoidPins[int(msg[0])-48], LOW);
-    }*/
-    /* Serial.println(int(msg[0])-48);  //FOR TEST
-    Serial.println(int(msg[1])-48);  //FOR TEST
-    delay(2000);*/
+  // if(isDigit(msg[0]) && isDigit(msg[1])){
+  //   solenoidState[int(msg[0])-48] = int(msg[1])-48;
+  /*if(int(msg[1])-48 == 1){
+    digitalWrite(solenoidPins[int(msg[0])-48], HIGH);
+  }else{
+    digitalWrite(solenoidPins[int(msg[0])-48], LOW);
+  }*/
+  /* Serial.println(int(msg[0])-48);  //FOR TEST
+  Serial.println(int(msg[1])-48);  //FOR TEST
+  delay(2000);*/
   //}
 
   // Count num elements in msg
   arrCount = 0;
-  for(int i = 0; i < 32; i++) {
-    if(msg[i] == '0' || msg[i] == '1') {
+  for (int i = 0; i < 32; i++)
+  {
+    if (msg[i] == '0' || msg[i] == '1')
+    {
       arrCount++;
     }
   }
+  //Serial.println(arrCount);
 
   // arrCount == sizeof(solenoidPins)/sizeof(solenoidPins[0])
   /*if(msg[0] == 'S' && msg[15] == 'E') {
@@ -292,25 +269,66 @@ void loop() {
     }
   }*/
 
-  count = 0;
-  while(msg[count] != 'S'){
-    count++;
+  // basic check sum
+  if(arrCount >= 7){
+    
+    count = 0;
+    while (msg[count] != 'S')
+    {
+      count++;
+    }
+    arrCount = 0;
+    while (msg[count] != 'E' && count < 17 && arrCount < 10)
+    {
+      if (msg[count] == '0')
+      {
+        solenoidState[arrCount] = 0;
+        arrCount++;
+      }
+      if (msg[count] == '1')
+      {
+        solenoidState[arrCount] = 1;
+        arrCount++;
+      }
+      count++;
+    }
+
+ /* int sum1 = 0;
+  int sum2 = 0;
+  int EPos = 0;
+
+  for(int j = 0; j < 32; j++){  //Split into 2 halves (1 btye each)
+ //while (msg[pos] != 'E'){
+    if(msg[j] == '0' || msg[j] == '1'){
+      sum1= (sum1 + int(msg[j])) % 255;
+      sum2 = (sum2 + sum1) % 255;
+    }
+    if(msg[j] == 'E'){
+      EPos =j;         //Position of E
+    }
   }
-  arrCount = 0;
-  while(msg[count] != 'E' && count < 17 && arrCount < 10){
-    if(msg[count] == '0'){
-      solenoidState[arrCount] = 0;
-      arrCount++;
+  
+  int CheckSum = (sum2 << 8) | sum1;  //shift sum2 and append sum1 to it
+  
+  if(CheckSum != int(msg[EPos - 1])){   //Check the index before E and compare to CheckSum
+    Serial.println("CheckSUM ERROR 2!!");
+  }*/
+
+    /* ABORT
+    * all bleeds open, mvas closed, dlpr off
+    */
+    if(solenoidState[6] == 1) {
+      solenoidState[0] = 1; // HE BLEED
+      solenoidState[1] = 0; // LNG BLEED
+      solenoidState[2] = 0; // LOX BLEED
+      solenoidState[3] = 0; //DLPR 1
+      solenoidState[4] = 0; //DLPR 2
+      solenoidState[5] = 0; //MVAS
     }
-    if(msg[count] == '1') {
-      solenoidState[arrCount] = 1;
-      arrCount++;
-    }
-    count++;
+
   }
 
-
-  Serial.println(msg);
+  //Serial.println(msg);
 
 
 
@@ -319,25 +337,23 @@ void loop() {
   /* -- HEARTBEAT --
    * looking for msg == 'rp' and will send state back on serial
    */
-  if(msg[0] == 'r' && msg[1] == 'p') {
+  if (msg[0] == 'r' && msg[1] == 'p')
+  {
     heartbeat = true;
     heartbeatStart = millis();
   }
 
   setSolenoidStates();
 
-
-  //save data to SD card and print to serial
+  // save data to SD card and print to serial
   printData();
 
-  // delay serial write as opposed to sychronous delay
-  //delay(DELAY);
-
+  delay(5);
 }
 
-
-  //For running average on thermcouple
-void avg(){
+// For running average on thermcouple
+void avg()
+{
 
   total = total - readings[readIndex];
   // read from the sensor:
@@ -348,7 +364,8 @@ void avg(){
   readIndex = readIndex + 1;
 
   // if we're at the end of the array...
-  if (readIndex >= numReadings) {
+  if (readIndex >= numReadings)
+  {
     // ...wrap around to the beginning:
     readIndex = 0;
   }
@@ -357,46 +374,49 @@ void avg(){
   average = total / numReadings;
 }
 
+// reads pressure sensor data
 
+void pressureSensorRead()
+{
 
-//reads pressure sensor data
-
-void pressureSensorRead() {
-
-  //read Mux
-  for (int i = 1; i <= 8; i++) {
+  // read Mux
+  for (int i = 1; i <= 8; i++)
+  {
     pressureSensor[i] = readPressureMux(16 - i);
   }
   pressureSensor[9] = readPressureMux(6);
   pressureSensor[10] = readPressureMux(5);
-  for (int i = 1; i <= 4; i++) {
+  for (int i = 1; i <= 4; i++)
+  {
     analogInput[i] = readPressureMux(5 - i);
   }
   batteryVoltage = readPressureMux(0);
-
 }
 
-int readPressureMux(int pressureChannel) {
+int readPressureMux(int pressureChannel)
+{
   int controlPin[] = {ps0, ps1, ps2, ps3};
 
-  //loop through the 4 sig
-  for (int i = 0; i < 4; i ++) {
+  // loop through the 4 sig
+  for (int i = 0; i < 4; i++)
+  {
     digitalWrite(controlPin[i], muxChannel[pressureChannel][i]);
   }
 
-  //read the value at the SIG pin
-  int pressureVal = analogRead(pressurePin);//ads.readADC_SingleEnded(pressurePin); 
-  //return the value
+  // read the value at the SIG pin
+  int pressureVal = analogRead(pressurePin); // ads.readADC_SingleEnded(pressurePin);
+  // return the value
   return pressureVal;
 }
 
 // reads solenoid current data
 
-void solenoidCurrentRead() {
+void solenoidCurrentRead()
+{
 
-
-  //read Mux
-  for (int i = 0; i < 10; i++) {
+  // read Mux
+  for (int i = 0; i < 10; i++)
+  {
     /*if (i % 2 == 0) {
       solenoidCurrent[i] = readCurrentMux(i + 1);
     } else {
@@ -407,71 +427,76 @@ void solenoidCurrentRead() {
   v3RegulatorCurrent = readCurrentMux(13);
   v5RegulatorCurrent = readCurrentMux(14);
   v12RegulatorCurrent = readCurrentMux(15);
-
-
-
 }
 
-int readCurrentMux(int currentChannel) {
+int readCurrentMux(int currentChannel)
+{
   int controlPin[] = {ss0, ss1, ss2, ss3};
 
-  //loop through the 4 sig
-  for (int i = 0; i < 4; i ++) {
+  // loop through the 4 sig
+  for (int i = 0; i < 4; i++)
+  {
     digitalWrite(controlPin[i], muxChannel[currentChannel][i]);
   }
 
-  //read the value at the SIG pin
-  //int currentVal = analogRead(ssSignal);
-  //return the value
+  // read the value at the SIG pin
+  // int currentVal = analogRead(ssSignal);
+  // return the value
   return analogRead(ssSignal);
 }
 
-//reads thermocouple data
-void thermocoupleRead() {
+// reads thermocouple data
+void thermocoupleRead()
+{
 
-  //only 10 thermocouple pins
-  //read Mux
-  for (int i = 0; i < 10; i++) {
+  // only 10 thermocouple pins
+  // read Mux
+  for (int i = 0; i < 10; i++)
+  {
     thermocouple[i] = readThermoMux(16 - i - 1);
   }
-
-
 }
 
-int readThermoMux(int thermoChannel) {
+int readThermoMux(int thermoChannel)
+{
   int controlPin[] = {ts0, ts1, ts2, ts3};
 
-  //loop through the 4 sig
-  for (int i = 0; i < 4; i ++) {
+  // loop through the 4 sig
+  for (int i = 0; i < 4; i++)
+  {
     digitalWrite(controlPin[i], muxChannel[thermoChannel][i]);
   }
 
-  //read the value at the SIG pin
-  //int thermoVal = analogRead(thermoPin); //ads.readADC_SingleEnded(thermoPin);
-  //return the value
+  // read the value at the SIG pin
+  // int thermoVal = analogRead(thermoPin); //ads.readADC_SingleEnded(thermoPin);
+  // return the value
   return analogRead(thermoPin);
 }
 
-void setSolenoidStates() {
-  for(int i = 0; i < 10; i++) {
+void setSolenoidStates()
+{
+  for (int i = 0; i < 10; i++)
+  {
     digitalWrite(solenoidPins[i], solenoidState[i]);
   }
 }
 
+// prints and loggs all data                                                                                                    
 
-// prints and loggs all data
-
-void printData() {
+void printData()                                                                                                                                                      
+{
 
   dataline = String(batteryVoltage);
   dataline += ',';
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
     dataline += String(solenoidState[i]);
     dataline += ',';
   }
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
     dataline += String(solenoidCurrent[i]);
     dataline += ',';
   }
@@ -481,58 +506,72 @@ void printData() {
   dataline += String(v5RegulatorCurrent);
   dataline += ',';
   dataline += String(v12RegulatorCurrent);
-  dataline += ',';
+  dataline += ',';      
 
-  for (int i = 1; i <= 10; i++) {
+  for (int i = 1; i <= 10; i++)
+  {
     dataline += String(pressureSensor[i]);
     dataline += ',';
   }
 
-  for (int i = 1; i <= 4; i++) {
+  for (int i = 1; i <= 4; i++)
+  {
     dataline += String(analogInput[i]);
     dataline += ',';
   }
 
-  for (int i = 0; i < 10; i++) {
-    dataline += String(thermocouple[i]);
+  for (int i = 0; i < 10; i++)
+  {
+    // dataline += String(thermocouple[i]);
+    dataline += String(int((0.45631 * thermocouple[i]) - 161.466));
     dataline += ',';
   }
 
   dataline += String(analogRead(A20));
   dataline += ',';
-    
 
-  dataline += String(millis());  
+  dataline += String(millis());
 
-  //log to SD card
+  // log to SD card
   char filename[fileName.length() + 1];
-  fileName.toCharArray(filename, fileName.length()+1);
+  fileName.toCharArray(filename, fileName.length() + 1);
   logfile = SD.open(filename, FILE_WRITE);
-  if(logfile) {
+  if (logfile)
+  {
     logfile.println(dataline);
     dataline += ",1,";
     digitalWrite(led, LOW);
-  }else{
+  }
+  else
+  {
     dataline += ",0,";
     digitalWrite(led, HIGH);
   }
 
   dataline += String(heartbeat);
 
-  logfile.close();
+  /*int sum1 = 0;
+  int sum2 = 0;
+  int checkSum = 0;
 
-
-  // nonblocking delayed wired telemetry
-  if(millis() - prvMsgTm > DELAY) {
-    Serial.println("S" + dataline + "E");
-    Serial5.println("S" + dataline + "E"); //added only do every interval
-    prvMsgTm = millis();
+  //for(int j = 0; j < (i-1); j++){
+  for(int j = 1; j < 16; j++){
+    if(dataline.charAt(j) == '0' || dataline.charAt(j) == '1'){
+      sum1= (sum1 + int(dataline.charAt(j))) % 255;
+      sum2 = (sum2 + sum1) % 255;
+    }
   }
+
+  checkSum = (sum2 << 8) | sum1;
+  dataline += ",+"+String(checkSum);*/
+
+  logfile.close();
+  Serial.println(dataline);
+  Serial5.println(dataline); // added
 
   // reset heartbeat
-  if(millis() - heartbeatStart > HEARTBEAT_SPAN) {
+  if (millis() - heartbeatStart > HEARTBEAT_SPAN)
+  {
     heartbeat = false;
   }
-
-}
-
+} 
