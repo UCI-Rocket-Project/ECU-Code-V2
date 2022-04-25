@@ -293,42 +293,58 @@ void loop()
       count++;
     }
 
- /* int sum1 = 0;
+  int sum1 = 0;
   int sum2 = 0;
   int EPos = 0;
 
-  for(int j = 0; j < 32; j++){  //Split into 2 halves (1 btye each)
- //while (msg[pos] != 'E'){
+  for(int j = 0; j < 16; j++){  //Split into 2 halves (1 btye each)
     if(msg[j] == '0' || msg[j] == '1'){
       sum1= (sum1 + int(msg[j])) % 255;
       sum2 = (sum2 + sum1) % 255;
     }
-    if(msg[j] == 'E'){
-      EPos =j;         //Position of E
-    }
   }
   
   int CheckSum = (sum2 << 8) | sum1;  //shift sum2 and append sum1 to it
+  String CheckSUM = String(CheckSum);
+  String Check;
+
+  for(int j = 0; j < 32; j++){  //Split into 2 halves (1 btye each)
+    if(msg[j] == 'E'){
+      EPos = j;
+    }
+  }
+
+  for(int j = 16; j < EPos-1; j++){
+    Check += msg[j];
+  }
+
+  if(Check.equals(CheckSUM) == false){
+    Serial.println("Check Sum ERROR!!");
+  }
+  else{
+    Serial.println("Check Sum GOOOOD");
+  }
+
   
-  if(CheckSum != int(msg[EPos - 1])){   //Check the index before E and compare to CheckSum
-    Serial.println("CheckSUM ERROR 2!!");
-  }*/
+  // if(CheckSum != int(msg[EPos - 1])){   //Check the index before E and compare to CheckSum
+  //   Serial.println("CheckSUM ERROR 2!!");
+  // }
 
     /* ABORT
     * all bleeds open, mvas closed, dlpr off
     */
-    if(solenoidState[6] == 1) {
+    /*if(solenoidState[6] == 1) {
       solenoidState[0] = 1; // HE BLEED
       solenoidState[1] = 0; // LNG BLEED
       solenoidState[2] = 0; // LOX BLEED
       solenoidState[3] = 0; //DLPR 1
       solenoidState[4] = 0; //DLPR 2
       solenoidState[5] = 0; //MVAS
-    }
+    }*/
 
   }
 
-  //Serial.println(msg);
+  Serial.println(msg);
 
 
 
@@ -485,38 +501,12 @@ void setSolenoidStates()
 
 void printData()                                                                                                                                                      
 {
+  dataline = "";
 
-  dataline = String(batteryVoltage);
-  dataline += ',';
 
   for (int i = 0; i < 10; i++)
   {
     dataline += String(solenoidState[i]);
-    dataline += ',';
-  }
-
-  for (int i = 0; i < 10; i++)
-  {
-    dataline += String(solenoidCurrent[i]);
-    dataline += ',';
-  }
-
-  dataline += String(v3RegulatorCurrent);
-  dataline += ',';
-  dataline += String(v5RegulatorCurrent);
-  dataline += ',';
-  dataline += String(v12RegulatorCurrent);
-  dataline += ',';      
-
-  for (int i = 1; i <= 10; i++)
-  {
-    dataline += String(pressureSensor[i]);
-    dataline += ',';
-  }
-
-  for (int i = 1; i <= 4; i++)
-  {
-    dataline += String(analogInput[i]);
     dataline += ',';
   }
 
@@ -529,6 +519,51 @@ void printData()
 
   dataline += String(analogRead(A20));
   dataline += ',';
+
+  int sum1 = 0;
+  int sum2 = 0;
+  int checkSum = 0;
+
+  //for(int j = 0; j < (i-1); j++){
+  for(int j = 1; j < 16; j++){
+    if(dataline.charAt(j) == '0' || dataline.charAt(j) == '1'){
+      sum1= (sum1 + int(dataline.charAt(j))) % 255;
+      sum2 = (sum2 + sum1) % 255;
+    }
+  }
+
+  checkSum = (sum2 << 8) | sum1;
+  dataline += "+"+String(checkSum);
+  dataline += ',';
+
+  /*dataline += String(batteryVoltage);
+  dataline += ',';
+
+  for (int i = 0; i < 10; i++)
+  {
+    dataline += String(solenoidCurrent[i]);
+    dataline += ',';
+  }
+
+  dataline += String(v3RegulatorCurrent);
+  dataline += ',';
+  dataline += String(v5RegulatorCurrent);
+  dataline += ',';
+  dataline += String(v12RegulatorCurrent);
+  dataline += ',';    
+
+  for (int i = 1; i <= 10; i++)
+  {
+    dataline += String(pressureSensor[i]);
+    dataline += ',';
+  }
+
+  for (int i = 1; i <= 4; i++)
+  {
+    dataline += String(analogInput[i]);
+    dataline += ',';
+  }*/
+
 
   dataline += String(millis());
 
@@ -550,20 +585,7 @@ void printData()
 
   dataline += String(heartbeat);
 
-  /*int sum1 = 0;
-  int sum2 = 0;
-  int checkSum = 0;
-
-  //for(int j = 0; j < (i-1); j++){
-  for(int j = 1; j < 16; j++){
-    if(dataline.charAt(j) == '0' || dataline.charAt(j) == '1'){
-      sum1= (sum1 + int(dataline.charAt(j))) % 255;
-      sum2 = (sum2 + sum1) % 255;
-    }
-  }
-
-  checkSum = (sum2 << 8) | sum1;
-  dataline += ",+"+String(checkSum);*/
+  
 
   logfile.close();
   Serial.println(dataline);
@@ -574,4 +596,6 @@ void printData()
   {
     heartbeat = false;
   }
+
+  delay(1);
 } 
