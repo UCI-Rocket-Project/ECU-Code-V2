@@ -1,18 +1,19 @@
-/* Code to be uploaded on the control unit. */
+/* Code to be uploaded on the unit mounted within the control box. */
 
 
 #include <Arduino.h>
 
 #define DELAY 50
-//can you flip a switch rn 
 
 const int PINS_ARR[] = {1, 2, 3, 5, 6, 7, 8};
 int PIN_STATE[(sizeof(PINS_ARR) / sizeof(PINS_ARR[0]))];
 
 int count = 0;
 
-int HEARTBEAT_DELAY = 2000;
+// HEARTBEAT COMMANDS
+unsigned int HEARTBEAT_DELAY = 2000;
 unsigned long lastHeartbeat;
+boolean heartbeat = false;
 
 
 void setup() { 
@@ -59,9 +60,10 @@ void loop()
   
 
   // [ S,0,0,0,0,0,0,0,0,0,0,E ] - sample all off w/ start and end char
-sum1 = 0;
-sum2 = 0;
-checkSum = 0;
+  //sum1 = 0;
+  //sum2 = 0;
+  //checkSum = 0;
+
   // Read and send switch states
   String txMsg = "S,";
   for(unsigned int i = 0; i < (sizeof(PINS_ARR) / sizeof(PINS_ARR[0])); i++) {
@@ -69,20 +71,32 @@ checkSum = 0;
     txMsg += String(PIN_STATE[i]) + ",";
   }
 
-/*for(int j = 0; j < 16; j++){
-    if(txMsg.charAt(j) == '0' || txMsg.charAt(j) == '1'){
-      sum1= (sum1 + int(txMsg.charAt(j))) % 255;
-      sum2 = (sum2 + sum1) % 255;
-    }
-}
+  /*for(int j = 0; j < 16; j++){
+      if(txMsg.charAt(j) == '0' || txMsg.charAt(j) == '1'){
+        sum1= (sum1 + int(txMsg.charAt(j))) % 255;
+        sum2 = (sum2 + sum1) % 255;
+      }
+  }
 
   checkSum = (sum2 << 8) | sum1;
 
   txMsg += String(checkSum);*/
-  txMsg += ",E"; // Extra comma needed?
+
+
+  // SEND ONCE EVERY HEARTBEAT_DELAY ms
+  txMsg += (heartbeat) ? "1" : "0";
+  heartbeat = false;
+  if(millis() - lastHeartbeat > HEARTBEAT_DELAY) {
+    heartbeat = true;
+    lastHeartbeat = millis();
+  }
+
+  txMsg += ",E";
+
+
   //txMsg[txMsg.length() - 1] = '\n';
 
-  // Serial.print(txMsg);
+  Serial.print(txMsg);
   Serial5.print(txMsg);
 
 

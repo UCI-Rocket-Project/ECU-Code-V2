@@ -83,6 +83,10 @@ bool heartbeat = false;
 unsigned long heartbeatStart;
 const int HEARTBEAT_SPAN = 5000;
 
+// TELEMETRY DELAY
+unsigned long telemStart;
+const int TELEM_SPAN = 50;
+
 void setup()
 {
 
@@ -220,7 +224,7 @@ void loop()
 
     // Serial.println(String(int(in)-48) + String(msg));  //FOR TEST
 
-    delayMicroseconds(120); // DO NOT DELETE THIS DELAY
+    delayMicroseconds(140); // DO NOT DELETE THIS DELAY
     if (int(in) == 10)
     { // if newline, break loop
       break;
@@ -251,7 +255,7 @@ void loop()
   arrCount = 0;
   for (int i = 0; i < 32; i++)
   {
-    if (msg[i] == '0' || msg[i] == '1')
+    if (msg[i] == '0' || msg[i] == 'a')
     {
       arrCount++;
     }
@@ -285,7 +289,7 @@ void loop()
         solenoidState[arrCount] = 0;
         arrCount++;
       }
-      if (msg[count] == '1')
+      if (msg[count] == 'a')
       {
         solenoidState[arrCount] = 1;
         arrCount++;
@@ -293,11 +297,11 @@ void loop()
       count++;
     }
 
-  int sum1 = 0;
+  /*int sum1 = 0;
   int sum2 = 0;
   int EPos = 0;
 
-  for(int j = 0; j < 16; j++){  //Split into 2 halves (1 btye each)
+  for(int j = 0; j < 15; j++){  //Split into 2 halves (1 btye each)
     if(msg[j] == '0' || msg[j] == '1'){
       sum1= (sum1 + int(msg[j])) % 255;
       sum2 = (sum2 + sum1) % 255;
@@ -308,9 +312,10 @@ void loop()
   String CheckSUM = String(CheckSum);
   String Check;
 
-  for(int j = 0; j < 32; j++){  //Split into 2 halves (1 btye each)
+  for(int j = 0; j < 32; j++){ 
     if(msg[j] == 'E'){
       EPos = j;
+      break;
     }
   }
 
@@ -322,8 +327,8 @@ void loop()
     Serial.println("Check Sum ERROR!!");
   }
   else{
-    Serial.println("Check Sum GOOOOD");
-  }
+    Serial.println("Check Sum GOOD");
+  }*/
 
   
   // if(CheckSum != int(msg[EPos - 1])){   //Check the index before E and compare to CheckSum
@@ -333,15 +338,17 @@ void loop()
     /* ABORT
     * all bleeds open, mvas closed, dlpr off
     */
-    /*if(solenoidState[6] == 1) {
+   /*
+   
+    if(solenoidState[6] == 1) {
       solenoidState[0] = 1; // HE BLEED
       solenoidState[1] = 0; // LNG BLEED
       solenoidState[2] = 0; // LOX BLEED
       solenoidState[3] = 0; //DLPR 1
       solenoidState[4] = 0; //DLPR 2
       solenoidState[5] = 0; //MVAS
-    }*/
-
+    }
+    */
   }
 
   Serial.println(msg);
@@ -504,28 +511,39 @@ void printData()
   dataline = "";
 
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 7; i++)
   {
     dataline += String(solenoidState[i]);
     dataline += ',';
   }
 
-  for (int i = 0; i < 10; i++)
+  // K-type
+  for (int i = 0; i < 2; i++)
   {
     // dataline += String(thermocouple[i]);
-    dataline += String(int((0.45631 * thermocouple[i]) - 161.466));
+    //dataline += String(int((0.45631 * thermocouple[i]) - 161.466));
+    dataline += String(int((0.40735 * thermocouple[i]) - 133.41));
+    dataline += ',';
+  }
+  //T-type
+  for (int i = 2; i < 10; i++)
+  {
+    dataline += String(int((0.3989 * thermocouple[i]) - 128.298));
     dataline += ',';
   }
 
-  dataline += String(analogRead(A20));
-  dataline += ',';
+  if(analogRead(A20) < 2000) {
+    dataline += "1,";
+  }else{
+    dataline += "0,";
+  }
 
   int sum1 = 0;
   int sum2 = 0;
   int checkSum = 0;
 
   //for(int j = 0; j < (i-1); j++){
-  for(int j = 1; j < 16; j++){
+  /*for(int j = 0; j < 13; j++){
     if(dataline.charAt(j) == '0' || dataline.charAt(j) == '1'){
       sum1= (sum1 + int(dataline.charAt(j))) % 255;
       sum2 = (sum2 + sum1) % 255;
@@ -534,7 +552,9 @@ void printData()
 
   checkSum = (sum2 << 8) | sum1;
   dataline += "+"+String(checkSum);
-  dataline += ',';
+  dataline += ',';*/
+
+
 
   /*dataline += String(batteryVoltage);
   dataline += ',';
@@ -585,9 +605,17 @@ void printData()
 
   dataline += String(heartbeat);
 
-  
+  dataline += ('E');
+
 
   logfile.close();
+
+  // every 50 ms
+  /*if (millis() - telemStart > TELEM_SPAN)
+  {
+    
+  }*/
+
   Serial.println(dataline);
   Serial5.println(dataline); // added
 
@@ -597,5 +625,5 @@ void printData()
     heartbeat = false;
   }
 
-  delay(1);
+  delay(5);
 } 
