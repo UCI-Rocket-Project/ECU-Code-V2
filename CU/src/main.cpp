@@ -90,7 +90,6 @@ void loop()
     heartbeat = true;
     lastHeartbeat = millis();
   }
-
   txMsg += ",E";
 
 

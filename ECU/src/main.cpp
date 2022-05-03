@@ -136,7 +136,7 @@ void setup()
   analogReadResolution(12);
 
   // pre check complete blink
-  for (int i = 0; i < 20; i++)
+  for (int i = 0; i < 10; i++)
   {
     digitalWrite(led, HIGH);
     delay(100);
@@ -180,7 +180,7 @@ void setup()
   delay(2000);
 
   // CSV starting line
-  dataline = String("Battery Voltage,Solenoid State 1,Solenoid State 2,Solenoid State 3,Solenoid State 4,Solenoid State 5,Solenoid State 6,Solenoid State 7,Solenoid State 8,Solenoid State 9,Solenoid State 10,Solenoid Current 1,Solenoid Current 2,Solenoid Current 3,Solenoid Current 4,Solenoid Current 5,Solenoid Current 6,Solenoid Current 7,Solenoid Current 8,Solenoid Current 9,Solenoid Current 10,3.3V Reg Current,5V Reg Current,12V Reg Current,Pressure Sensor 1,Pressure Sensor 2,Pressure Sensor 3,Pressure Sensor 4,Pressure Sensor 5,Pressure Sensor 6,Pressure Sensor 7,Pressure Sensor 8,Pressure Sensor 9,Pressure Sensor 10,Analog Sensor 1,Analog Sensor 2,Analog Sensor 3,Analog Sensor 4,Thermocouple 1,Thermocouple 2,Thermocouple 3,Thermocouple 4,Thermocouple 5,Thermocouple 6,Thermocouple 7,Thermocouple 8,Thermocouple 9,Thermocouple 10,Time");
+  dataline = String("He BV,LNG BV,LOX BV,DLPR 1,DLPR 2,MVAS,Abort,Heartbeat,TC1,TC2,TC3,TC4.MVAS_HallEffect,Time");
   logfile.println(dataline);
   logfile.flush();
 
@@ -195,7 +195,6 @@ void setup()
 }
 
 char msg[32] = "";
-//char msg[33] = "";
 int arrCount;
 int count;
 
